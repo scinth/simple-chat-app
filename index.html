@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Chat App</title>
+		<style>
+			* {
+				padding: 0;
+				box-sizing: border-box;
+			}
+			html {
+				font-size: 1em;
+				font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			}
+			body {
+				margin: 0;
+				min-height: 100vh;
+				background-color: black;
+				display: flex;
+				justify-content: center;
+				align-items: stretch;
+			}
+			body > :first-child {
+				width: 100%;
+				max-width: 700px;
+			}
+			#auth {
+				background-color: white;
+			}
+			#invalidMessage {
+				color: #f01d1d;
+				padding: 1rem;
+				text-decoration: underline;
+			}
+			#chat_page {
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+				background-color: white;
+			}
+			#chat_page > * {
+				margin: 0;
+			}
+			.username {
+				padding: 1em;
+				font-size: 1.2em;
+				font-weight: bold;
+				position: sticky;
+				top: 0;
+				background-color: white;
+				box-shadow: 0 1px 4px 2px rgba(0, 0, 0, 0.2);
+				z-index: 1;
+			}
+			ul {
+				list-style-type: none;
+			}
+			#chatbox {
+				flex-grow: 1;
+			}
+			ul li {
+				margin-top: 1.3rem;
+			}
+			ul li div {
+				position: relative;
+				color: white;
+				background-color: gray;
+				border-radius: 1.5em;
+				padding: 0.8em 1.3em;
+				margin: 0.8em 1.3em;
+				width: max-content;
+				min-width: 200px;
+				max-width: 300px;
+			}
+			ul li div.me {
+				margin-left: auto;
+				background-color: dodgerblue;
+			}
+			ul li div .name {
+				position: absolute;
+				top: 0;
+				color: black;
+				font-size: 0.7em;
+				font-weight: bold;
+				margin-top: -1.3em;
+			}
+			form {
+				position: sticky;
+				bottom: 0;
+				background-color: white;
+			}
+			form[name='chat_form'] {
+				box-shadow: 0 -1px 4px 1px rgba(0, 0, 0, 0.2);
+			}
+			form label {
+				padding: 1rem 1rem 0;
+				font-weight: bold;
+				color: #333;
+			}
+			input {
+				border: 1px solid gray;
+				border-radius: 3px;
+				padding: 0.8em 1.3em;
+				font-weight: bold;
+				margin: 1em 0;
+			}
+			input[type='text'] {
+				margin-left: 1em;
+				width: 70%;
+			}
+			input[type='submit'] {
+				border: none;
+				color: white;
+				background-color: dodgerblue;
+				cursor: pointer;
+			}
+		</style>
+		<script src="/socket.io/socket.io.js"></script>
+		<script>
+			const socket = io();
+			const renderPage = function (user) {
+				username = user;
+				let html = `
+				<div id="chat_page">
+					<span class="username">${user}</span>
+					<ul id="chatbox"></ul>
+					<form id="chat_form" name="chat_form" autocomplete="off">
+						<input type="text" name="message" id="message" />
+						<input type="submit" value="Send" />
+					</form>
+				</div>
+				`;
+				document.body.innerHTML = html;
+				const form = document.getElementById('chat_form');
+				form.addEventListener('submit', function (e) {
+					e.preventDefault();
+					let message = {
+						sender: username,
+						content: this.message.value,
+					};
+					writeMessage(message, true);
+					socket.emit('sendMessageToAll', message);
+					this.reset();
+				});
+			};
+			const renderInvalid = function (user) {
+				let invalidMessage = document.getElementById('invalidMessage');
+				invalidMessage.innerHTML = `Username <b>"${user}"</b> already exist or is invalid, please use another username`;
+			};
+			const writeMessage = function (message, isFromMe = false) {
+				let chatbox = document.getElementById('chatbox');
+				let queue = document.createElement('li');
+				queue.innerHTML = `
+					<div ${isFromMe ? 'class="me"' : ''}>
+						<span class="name">${isFromMe ? 'You' : message.sender}</span>
+						${message.content}
+					</div>
+				`;
+				chatbox.append(queue);
+				window.scrollTo({
+					top: window.innerHeight,
+					behavior: 'smooth',
+				});
+			};
+			socket.on('userConnect', renderPage);
+			socket.on('invalidUsername', renderInvalid);
+			socket.on('sendMessage', writeMessage);
+			socket.on('disconnectUser', function () {
+				socket.emit('removeUser', username);
+			});
+			document.addEventListener('DOMContentLoaded', function () {
+				var username = null;
+				let login = document.getElementById('login');
+				login.addEventListener('submit', function (e) {
+					e.preventDefault();
+					socket.emit('addNewUser', login.username.value);
+					this.reset();
+				});
+			});
+		</script>
+	</head>
+	<body>
+		<div id="auth">
+			<form action="none" name="login" id="login">
+				<label for="username">Please enter a username:</label><br />
+				<input
+					type="text"
+					id="username"
+					name="username"
+					placeholder="ex: user1"
+					autocomplete="off"
+					autofocus="on"
+				/>
+				<input type="submit" value="Log In" />
+			</form>
+			<span id="invalidMessage"></span>
+		</div>
+	</body>
+</html>
